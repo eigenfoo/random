@@ -9,28 +9,24 @@ NUM_FEATURES = 4
 BATCH_SIZE = 32
 NUM_BATCHES = 300
 
+class Data(object):
+    def __init__(self):
+        num_samp = 50
+        sigma = 0.1
+        np.random.seed(31415)
 
-def data():
-    num_samp = 50
-    sigma = 0.1
-    
-    # We're going to learn these paramters 
-    w = np.array([4, 3, 4, 2])
-    b = 2
-    
-    np.random.seed(31415)
-    for _ in range(num_samp):
-        x = np.random.uniform(size=4)
-        y = w @ x + b + sigma * np.random.normal()
+        # We're going to learn these paramters 
+        w = np.atleast_2d([4, 3, 4, 2]).transpose()
+        b = 2
 
-        yield x, y
+        self.index = np.arange(num_samp)        
+        self.x = np.random.uniform(size=(num_samp, 4))
+        self. y = self.x @ w + b + sigma * np.random.normal()
+        
+    def get_batch(self):
+        choices = np.random.choice(self.index, size=BATCH_SIZE)
 
-
-def get_batch():
-    gen = data()
-    x, y = zip(*[next(gen) for _ in range(0, BATCH_SIZE)])
-
-    return x, y
+        return self.x[choices], self.y[choices].flatten()
 
 
 def f(x):
@@ -52,8 +48,10 @@ init = tf.global_variables_initializer()
 sess = tf.Session()
 sess.run(init)
 
+data = Data()
+
 for _ in tqdm(range(0, NUM_BATCHES)):
-    x_np, y_np = get_batch()
+    x_np, y_np = data.get_batch()
     loss_np, _ = sess.run([loss, optim], feed_dict={x: x_np, y: y_np})
 
 print("Parameter estimates:")

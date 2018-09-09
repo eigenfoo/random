@@ -1,5 +1,5 @@
 '''
-ECE 471, Selected Topics in Machine Learning – Assignment 1
+ECE 471, Selected Topics in Machine Learning - Assignment 1
 
 Submit by Sept. 12, 10pm
 
@@ -14,12 +14,10 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from tqdm import tqdm
 
-sns.set_style('whitegrid')
-
 NUM_DATAPOINTS = 50
-NUM_FEATURES = 4
+NUM_FEATURES = 3
 BATCH_SIZE = 10  # Batch size must evenly divide NUM_DATAPOINTS... sorry
-NUM_EPOCHS = 500
+NUM_EPOCHS = 300
 
 sigma = 0.1
 np.random.seed(31415)

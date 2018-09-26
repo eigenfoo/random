@@ -6,10 +6,10 @@ import numpy as np
 import tensorflow as tf
 from scipy import sparse
 
-NUM_ITEMS = 20000
-NUM_USERS = 1000
-RANK = 20
-NUM_EPOCHS = 10000
+NUM_ITEMS = 5000
+NUM_USERS = 100
+RANK = 10
+NUM_EPOCHS = 10
 
 
 def build_toy_dataset(noise_std=0.1):
@@ -46,3 +46,8 @@ with tf.Session() as sess:
     for _ in range(NUM_EPOCHS):
         loss_, _ = sess.run([loss, optim])
         print(loss_)
+
+    for var in tf.trainable_variables():
+        name = var.name.rstrip(":0")
+        value = np.array(sess.run(var))
+        np.savetxt("{}.csv".format(name), value, delimiter=",")

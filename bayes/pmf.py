@@ -19,6 +19,9 @@ def build_toy_dataset(noise_std=0.1):
     V = sparse.random(RANK, NUM_ITEMS, 0.05)
     R = U.transpose() * V
     nonzero_rows, nonzero_cols, nonzero_vals = sparse.find(R)
+    np.savetxt("U.csv", U, delimiter=",")
+    np.savetxt("V.csv", V, delimiter=",")
+    np.savetxt("R.csv", R, delimiter=",")    
     return U, V, R, nonzero_rows, nonzero_cols, nonzero_vals
 
 

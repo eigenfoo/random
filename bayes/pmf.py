@@ -64,6 +64,9 @@ with tf.name_scope('loss'):
     regularization_V = lambda_V * tf.reduce_sum(tf.norm(V, axis=1))
     loss = error + regularization_U + regularization_V
 
+    tf.summary.scalar('error', error)
+    tf.summary.scalar('regularization_U', regularization_U)
+    tf.summary.scalar('regularization_V', regularization_V)
     tf.summary.scalar('loss', loss)
 
 with tf.name_scope('train'):

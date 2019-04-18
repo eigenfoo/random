@@ -2,7 +2,7 @@
 
 Some Jupyter notebooks from learning, researching and exploring concepts in
 machine learning, data science, quantitative finance... in short, the results of
-my wanderings through different topics. This repo is full of rough and uncut
+my wanderings through different topics. This repository is full of rough and uncut
 ideas (and yes, probably some garbage), but if you're lucky you might find
 something that interests you.
 

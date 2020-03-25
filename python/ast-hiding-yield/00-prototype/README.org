@@ -1,0 +1,139 @@
+#+TITLE: PyMC4 — Hiding ~yield~ from the Model Specification API (Initial Prototype)
+#+AUTHOR: George Ho
+#+DATE: 2019:07:10
+
+* Problem Statement
+
+  Currently our model specification API looks something like this (linear
+  regression example taken from Max's notebook [fn:1].
+
+  #+BEGIN_SRC python
+    def model(x):
+        scale = yield tfd.HalfCauchy(0, 1)
+        coefs = yield tfd.Normal(tf.zeros(x.shape[1]), 1, )
+        predictions = yield tfd.Normal(tf.linalg.matvec(x, coefs), scale)
+        return predictions
+  #+END_SRC
+
+  (Note that we will have ~pm.Normal~ instead of ~tfd.Normal~, and we will also
+  have the ~@pm.model~ decorator over the whole function).
+
+  The main drawback to this API is that the ~yield~ keyword is confusing. Many
+  users don't really understand Python generators, and those who do might only
+  understand ~yield~ as a drop-in replacement for ~return~ (that is, they might
+  understand what it means for a function to end in ~yield foo~, but would be
+  uncomfortable with ~bar = yield foo~).
+
+  Furthermore, the ~yield~ keyword introduces a leaky abstraction: users don't
+  care about whether ~model~ is a function or a generator, and they shouldn't
+  need to. More generally, users shouldn't have to know anything about how PyMC
+  works in order to use it: ideally, the only thing users would need to think
+  about would be their data and their model. Having to graft several ~yield~
+  keywords into their code is a fairly big intrusion in that respect.
+
+  Finally, this model specification API is essentially moving the problem off of
+  our plates and onto our users. The entire point of the PyMC project is to
+  provide a friendly and easy-to-use interface for Bayesian modeling.
+
+** Enumerating the problem
+
+   The problem is twofold:
+
+   1. Hide the ~yield~ keyword from the user-facing model specification API.
+   2. Obtain the user-defined model as a generator.
+      * The main difficulty with the first goal is that as soon as we remove
+        ~yield~ from the ~model~ function, it is no longer a generator.
+      * But the PyMC core engine needs the model as a generator, since this
+        allows us to interrupt the model at various points to do various things:
+        1. Manage random variable names.
+        2. Perform sampling.
+        3. Other arbitrary PyMC magic that I'm truthfully not familiar with.
+      * In short, the user writes their model as a function, but we require the
+        model as a generator.
+
+** Why is this problem hard?
+
+   This is probably best explained by enumerating why a naive solution doesn't
+   actually work.
+
+   A first thought might be to simply make ~pm.Normal~ yield ~tfd.Normal~: in
+   other words, simply move the ~yield~ keyword into the PyMC4 distribution
+   classes.
+
+   1. As soon as ~yield~ is removed from ~model~, the ~model~ function is no
+      longer a generator: we would need some way of "hijacking" a user-written
+      function into becoming a generator. /Notice that goals (1) and (2) are
+      actually at odds with each other./
+
+   2. Even worse, the ~yield~ would probably live in the ~__new__~ function of
+      ~pm.Normal~. This would mean that when ~pm.Normal~ is instantiated, you
+      don't get an object, but a generator that yields an object. This is
+      probably a Bad Idea™, since it would go against the [[https://docs.python.org/3/reference/datamodel.html#object.__new__][documentation for
+      Python objects]], and developers generally assume that an instantiated class
+      is an object.
+
+* Proposed Solution
+
+  *tldr:* In the ~pm.Model~ decorator (which is not a function, but a
+  class [fn:2]), we manipulate the abstract syntax tree (AST) of the user-written
+  model specification function to convert it into a generator [fn:3] [fn:4]. We
+  store the generator as a class attribute of our decorator class.
+
+  Refer to the accompanying notebook for code and exposition.
+
+* Discussion and Next Steps
+
+*** Pros
+
+    1. It solves the problem! :)
+    2. If we /wanted/ to support auto-naming, it would make sense to bundle it
+       inside the ~ast.NodeTranformer~.
+
+*** Cons
+
+    1. This solution involves:
+       1. Decorators (and not just function decorators, but class decorators!)
+       2. Parsing and transforming an AST.
+
+       The first is not a well-known idiom, but that's manageable. The second is
+       very magical (in a bad way), and demands a surprisingly robust
+       understanding of core Python. For example, it's important to understand
+       the difference between ~exec~ and ~eval~ [fn:5] (and why we can't use
+       ~eval~, even though it would be better in our situation), and what
+       ~locals()~ keyword is doing in the ~exec~ function (and why that's best
+       practice [fn:6]). None of this is good for maintainability or developer
+       quality of life.
+
+*** Next Steps
+
+    1. I'm not sure what else the ~pm.Model~ decorator is supposed to do [fn:7],
+       so I'm not sure how this proposal fits into the larger design of PyMC4.
+       As far as I can tell, nothing seems to be a deal breaker...
+    2. Users may be confused by whether the model is a function or an object,
+       or something in between: we will have to carefully document this in the
+       user/developer guide.
+    3. See the "What else can we do in the Model decorator?" section of the
+       accompanying notebook.
+
+* Links and References
+
+[fn:1] Max's API design notebook:
+https://gist.github.com/ferrine/59a63c738e03911eacba515b5be904ad
+
+[fn:2] Classes as decorators:
+https://realpython.com/primer-on-python-decorators/#classes-as-decorators
+
+[fn:3] Uncompiling and recompiling code to source and back:
+http://code.activestate.com/recipes/578353-code-to-source-and-back/
+
+[fn:4] Official AST docs and Green Tree Snakes field guide to ASTs:
+https://docs.python.org/3/library/ast.html and
+https://greentreesnakes.readthedocs.io/en/latest/index.html
+
+[fn:5] ~eval~, ~exec~ and ~compile~: https://stackoverflow.com/q/2220699
+
+[fn:6] Be careful with ~exec~ and ~eval~ in Python:
+http://lucumr.pocoo.org/2011/2/1/exec-in-python/
+
+[fn:7] Current model decorators in PyMC4:
+https://github.com/pymc-devs/pymc4/blob/master/pymc4/coroutine_model.py

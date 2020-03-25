@@ -1,0 +1,50 @@
+#+TITLE: Hiding ~yield~ from the PyMC4 Model Specification API (First Iteration)
+#+AUTHOR: George Ho
+#+DATE: 2019:07:15
+
+See the initial prototype here: https://gist.github.com/eigenfoo/317e8708ff14e9ef4890cdd9487a8ad8
+
+* Goals
+
+Feedback:
+
+  1. Determine what to ~yield~.
+     * Currently, we transform all assignments to ~yield~ statements. In reality,
+       we should only ~yield~ ~tfd~ distributions, and even user-written
+       distributions/sub-functions/sub-models (such as Max's ~Horseshoe~
+       example).
+  2. Sometimes we want something like passing a prior into a function and we
+     will have something like ~tfd.Normal.dist()~, and the ~yield~ is happening
+     somewhere inside another function. In other words, we somewhere need to
+     distinguish between cases where we actually want pure distributions, and
+     not their samples. E.g. GLMs.
+
+* Potential Solution
+
+1. While parsing the AST, if the function that is being assigned is not
+   obviously a distribution (i.e., if it ~isinstance(func, tfd.Distribution)~),
+   then ~yield~ from it.
+2. Otherwise, if ~isinstance(func, pm.Model)~, then ~yield from~ it.
+3. This means that every user-written sub-function (even if they are just
+   self-implemented distributions like ~Horseshoe~) must be decorated with
+   ~@pm.Model~. This seems like a reasonable and painless requirement.
+
+* Outstanding Issues
+
+** TODO Figure out Max's GLM concern
+   * I.e. goal #2.
+   * Not sure what needs to be done here... help needed.
+** TODO Use ~astor~ to turn modified AST back into readable source for stack traces
+   * When we ~compile~ the modified AST back into bytecode, we also pass back
+     the original source code. This means that stack traces don't show the
+     ~yield~ and ~yield from~ that we've put in.
+   * ~astor.to_source()~ does what we need, but ~compile~ must take a filename,
+     not a string or an IO stream... and we really shouldn't write to a file...
+** TODO Check if tree has been modified. If it hasn't, log it or raise an error.
+   * Each ~pm.Model~ should have a bool that tracks whether its AST has been
+     modified or not (i.e. compare tree before and after being visited by
+     ~NodeTransformer~). If ~False~, raise an error.
+   * Note that, since ~ast.NodeTransformer~ modifies the tree in-place, we will
+     need to ~copy.copy~ the tree before modifying it.
+   * Difficult to determine equality of ASTs...? See
+     https://stackoverflow.com/q/3312989
